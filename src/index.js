@@ -8,8 +8,8 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-export default {
-	async fetch(request, env, ctx) {
-		return new Response('Hello World!');
-	},
-};
+import { httpServerHandler } from 'cloudflare:node'
+import app from './express-server'
+
+app.listen(3000)
+export default httpServerHandler({ port: 3000 })
