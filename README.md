@@ -86,3 +86,62 @@ Note that, unlike NPM, Bun requires an explicit installation step (on `ubuntu-la
 
 ## Part 3
 
+As mentioned, I was unable to deploy to Firebase due to having reached my project quota. Instead, I used a Cloudflare Worker, which is very similar to a Firebase Function.
+
+The Workers docs have a [tutorial on deploying an Express.js application][tutorial]. The steps are similar to what you'd do in a Firebase project. You scaffold a project with `npm create cloudflare@latest` and then use `wrangler`, Cloudflare's developer CLI tool (analogous to the `firebase` command). The server code does need to be slightly adapted for the Workers runtime. In my case, I decided to export a pure express app from [src/express-server.js](src/express-server.js) and import it into [src/index.js](src/index.js), the actual worker entrypoint:
+
+```
+// src/index.js
+// Main Worker
+
+import { httpServerHandler } from 'cloudflare:node'
+import app from './express-server'
+
+app.listen(3000)
+export default httpServerHandler({ port: 3000 })
+```
+
+[tutorial]: https://developers.cloudflare.com/workers/tutorials/deploy-an-express-app/
+
+### Storing Cloudflare secrets in GitHub
+
+To automatically [deploy the Worker with GitHub Actions][deploy-worker], it's necessary to first import CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (not actually a secret) into GitHub as secrets, and then into the build environment with the special `${{ secrets.SECRET_TOKEN }}` syntax in the workflow YAML configuration. The YAML is detailed below. I accomplished the first part using the [GitHub CLI](https://cli.github.com/manual/gh_secret_set) and a .env file (which is placed in the working tree but added to .gitignore and never committed, for obvious security reasons):
+
+```env
+# .env
+CLOUDFLARE_API_TOKEN=[token_here]
+CLOUDFLARE_ACCOUND_ID=[id_here]
+```
+
+```bash
+$ gh secret set -f .env
+```
+
+### New `deploy` Job in Workflow
+
+Finally, I added a new `deploy` job underneat `test` in [.github/workflows/bun-test.yml](.github/workflows/bun-test.yml), modeled after the [template from Cloudflare's docs][deploy-worker].
+
+[deploy-worker]: https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/
+
+```
+...
+
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+      - name: Build & Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.75.0"
+```
+
+### Results
+
+On first push, I hadn't yet added the "Install bun" step. (I thought perhaps `cloudflare/wrangler-action@v3` would use NPM, but it must have detected my bun.lock file.) The deployment also failed on second push because `cloudflare/wrangler-action@v3` uses an old version of Wrangler by default that doesn't pick up the newer, comment-permitting [`wrangler.jsonc`](wrangler.jsonc) confuration file. The fix was to explicitly specify `wranglerVersion` as a parameter to the Action as shown.
+
