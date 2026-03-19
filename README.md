@@ -145,7 +145,7 @@ Finally, I appended a new job, `deploy`, underneath `test` in [.github/workflows
 
 ### Results
 
-On first push, I hadn't yet added the "Install bun" step. (I thought perhaps `cloudflare/wrangler-action@v3` would use NPM, but it must have detected my bun.lock file.) The deployment also failed on second push because the action uses an old version of Wrangler by default that doesn't pick up the newer, comment-permitting [`wrangler.jsonc`](wrangler.jsonc) confuration file. The fix was to explicitly specify `wranglerVersion` as a parameter to the Action as shown.
+On first push, I hadn't yet added the "Install bun" step. (I thought perhaps `cloudflare/wrangler-action@v3` would use NPM, but it must have detected my bun.lock file.) The deployment also failed on second push because the action uses an old version of Wrangler by default that doesn't pick up the newer, comment-permitting [`wrangler.jsonc`](wrangler.jsonc) config file. The fix was to explicitly specify `wranglerVersion` as a parameter to the Action as shown.
 
 
 On third and subsequent pushes, tests and deployment all succeeded. The finished worker is live at <https://ra24-3-cloudflare.ohn-sh.workers.dev/>. Additionally, the GitHub Actions log is publicly viewable at <https://github.com/ohnsh/ra24-3-cloudflare/actions>.
