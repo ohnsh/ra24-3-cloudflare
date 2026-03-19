@@ -1,16 +1,16 @@
 # Required Assignment 24.3: Set Up a CI/CD Pipeline (Cloudflare Worker)
 
-MIT xPRO Professional Certificate in Full-Stack Coding\
 John Sherrell\
-Wednesday, March 18, 2026
+Wednesday, March 18, 2026\
+MIT xPRO Professional Certificate in Full-Stack Coding
 
 ## Report
 
 There are three main components to this assignment:
 
-1. Set up express.js "Hello World" app.
-2. Set up automated testing on push using GitHub Actions.
-3. Set up automated deployment on push using GitHub Actions.
+1. An Express.js "Hello World" app and automated test.
+2. Configuring automated testing on push using GitHub Actions.
+3. Configuring automated deployment on push using GitHub Actions.
 
 The assignment calls for [deploying to Firebase](https://firebase.google.com/docs/hosting/github-integration), but I had already reached my Firebase project quota in a recent module. I requested an increase last night but haven't heard back. Ultimately, I decided to use a Cloudflare Worker instead of Firebase.
 
@@ -53,7 +53,7 @@ test('Express Hello Whirled', async () => {
 })
 ```
 
-Note that 'bun:test' is compatible with Jest but used with [Bun's built-in test runner](https://bun.com/docs/test).
+Note that the `bun:test` module is compatible with Jest but used with [Bun's built-in test runner](https://bun.com/docs/test).
 
 ## Part 2
 
@@ -80,17 +80,19 @@ jobs:
 ...
 ```
 
-Note that, unlike NPM, Bun requires an explicit installation step (on `ubuntu-latest`, at least). [Logs showing the test succeeding][logs] are publicly viewable in this repository's Actions tab.
+Unlike NPM, Bun requires an explicit installation step (on `ubuntu-latest`, at least). [Logs showing the test succeeding][logs] are publicly viewable in this repository's Actions tab.
 
 [logs]: https://github.com/ohnsh/ra24-3-cloudflare/actions/runs/23273546781/job/67671431938
 
 ## Part 3
 
-As mentioned, I was unable to deploy to Firebase due to having reached my project quota. Instead, I used a Cloudflare Worker, which is very similar to a Firebase Function.
+As mentioned, I was unable to deploy to Firebase due to having reached my project quota. Instead, I used a Cloudflare Worker, which is similar to a Firebase Function.
 
-The Workers docs have a [tutorial on deploying an Express.js application][tutorial]. The steps are similar to what you'd do in a Firebase project. You scaffold a project with `npm create cloudflare@latest` and then use `wrangler`, Cloudflare's developer CLI tool (analogous to the `firebase` command). The server code does need to be slightly adapted for the Workers runtime. In my case, I decided to export a pure express app from [src/express-server.js](src/express-server.js) and import it into [src/index.js](src/index.js), the actual worker entrypoint:
+The Workers docs have a [tutorial on deploying an Express.js application][tutorial]. The steps are similar to what you'd do in a Firebase project. To scaffold a new project, you run `npm create cloudflare@latest`. For most everything else, you use `wrangler`, Cloudflare's developer CLI tool (analogous to the `firebase` command), which you generally install as a project dependency.
 
-```
+The Express server does need to be slightly adapted for the Workers runtime. In my case, I decided to export a pure express app from [src/express-server.js](src/express-server.js) and import it into [src/index.js](src/index.js), the actual worker entry point:
+
+```js
 // src/index.js
 // Main Worker
 
@@ -105,21 +107,21 @@ export default httpServerHandler({ port: 3000 })
 
 ### Storing Cloudflare secrets in GitHub
 
-To automatically [deploy the Worker with GitHub Actions][deploy-worker], it's necessary to first import CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (not actually a secret) into GitHub as secrets, and then into the build environment with the special `${{ secrets.SECRET_TOKEN }}` syntax in the workflow YAML configuration. The YAML is detailed below. I accomplished the first part using the [GitHub CLI](https://cli.github.com/manual/gh_secret_set) and a .env file (which is placed in the working tree but added to .gitignore and never committed, for obvious security reasons):
+To automatically [deploy the Worker with GitHub Actions][deploy-worker], it's necessary to first import a Cloudflare account ID and API token into GitHub as secrets (the account ID isn't actually a secret), and then into the Actions build environment using the special `${{ secrets.SECRET_TOKEN }}` syntax in the YAML configuration. The YAML is detailed below. I accomplished the first part using the [GitHub CLI](https://cli.github.com/manual/gh_secret_set) and a .env file (which is placed in the working tree but added to .gitignore and never committed, for obvious security reasons):
 
 ```env
 # .env
 CLOUDFLARE_API_TOKEN=[token_here]
-CLOUDFLARE_ACCOUND_ID=[id_here]
+CLOUDFLARE_ACCOUNT_ID=[id_here]
 ```
 
-```bash
+```console
 $ gh secret set -f .env
 ```
 
 ### New `deploy` Job in Workflow
 
-Finally, I added a new `deploy` job underneat `test` in [.github/workflows/bun-test.yml](.github/workflows/bun-test.yml), modeled after the [template from Cloudflare's docs][deploy-worker].
+Finally, I appended a new job, `deploy`, underneath `test` in [.github/workflows/bun-test.yml](.github/workflows/bun-test.yml), modeled after the [template from Cloudflare's docs][deploy-worker].
 
 [deploy-worker]: https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/
 
@@ -143,5 +145,7 @@ Finally, I added a new `deploy` job underneat `test` in [.github/workflows/bun-t
 
 ### Results
 
-On first push, I hadn't yet added the "Install bun" step. (I thought perhaps `cloudflare/wrangler-action@v3` would use NPM, but it must have detected my bun.lock file.) The deployment also failed on second push because `cloudflare/wrangler-action@v3` uses an old version of Wrangler by default that doesn't pick up the newer, comment-permitting [`wrangler.jsonc`](wrangler.jsonc) confuration file. The fix was to explicitly specify `wranglerVersion` as a parameter to the Action as shown.
+On first push, I hadn't yet added the "Install bun" step. (I thought perhaps `cloudflare/wrangler-action@v3` would use NPM, but it must have detected my bun.lock file.) The deployment also failed on second push because the action uses an old version of Wrangler by default that doesn't pick up the newer, comment-permitting [`wrangler.jsonc`](wrangler.jsonc) confuration file. The fix was to explicitly specify `wranglerVersion` as a parameter to the Action as shown.
 
+
+On third and subsequent pushes, tests and deployment all succeeded. The finished worker is live at <https://ra24-3-cloudflare.ohn-sh.workers.dev/>. Additionally, the GitHub Actions log is publicly viewable at <https://github.com/ohnsh/ra24-3-cloudflare/actions>.
